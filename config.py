@@ -16,9 +16,9 @@ def _default_settings():
         "refresh_rect": None,
         "iv_only": False,
         "arms": {name: True for name in ARMAMENT_NAMES},
-        "refresh_delay": DEFAULT_REFRESH_DELAY,
-        "max_rounds": DEFAULT_MAX_ROUNDS,
-        "action_delay": DEFAULT_ACTION_DELAY,
+        "refresh_delay": 5,
+        "max_rounds": 0,
+        "action_delay": 300,
     }
 
 
