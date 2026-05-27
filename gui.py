@@ -4,6 +4,7 @@ import threading
 import queue
 import time
 import traceback
+import ctypes
 
 from constants import (
     ARMAMENT_NAMES, CARD_COUNT,
@@ -36,6 +37,8 @@ class App:
         self._restore_state()
         self._poll_log()
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+        ctypes.windll.user32.RegisterHotKey(self.root.winfo_id(), 1, 0, 0x77)
+        self.root.bind("<F8>", lambda e: self._stop())
 
     def _build_ui(self):
         p = {"padx": 8, "pady": 4}
@@ -96,6 +99,7 @@ class App:
         self.btn_start.pack(side=tk.LEFT, padx=4)
         self.btn_stop = ttk.Button(bf, text="■ 停止", command=self._stop, width=12, state="disabled")
         self.btn_stop.pack(side=tk.LEFT, padx=4)
+        ttk.Label(bf, text="按 F8 停止", foreground="gray").pack(side=tk.LEFT, padx=8)
 
         self.log = scrolledtext.ScrolledText(f, width=55, height=16, font=("Consolas", 9), state="disabled", wrap=tk.WORD)
         self.log.grid(row=sep + 2, column=0, columnspan=3, sticky="nsew", **p)

@@ -1,7 +1,7 @@
 {
   "cards_rect": null,
   "refresh_rect": null,
-  "iv_only": false,
+  "iv_only": true,
   "arms": {
     "六联导弹发射器": true,
     "轻型导弹发射器": true,
@@ -20,12 +20,12 @@
     "蓄能射束炮": false,
     "重型榴弹炮": true,
     "格斗防盾": false,
-    "干扰烟幕散布器": false,
+    "干扰烟幕散布器": true,
     "热能剑": false,
     "光学迷彩无人机": false,
     "热能大剑": false
   },
   "refresh_delay": 1,
-  "max_rounds": 0,
-  "action_delay": 300
+  "max_rounds": 100,
+  "action_delay": 200
 }
