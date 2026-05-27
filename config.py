@@ -9,16 +9,22 @@ else:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(BASE_DIR, "config.json")
 
+DEFAULT_CHECKED = {
+    "六联导弹发射器", "轻型导弹发射器", "重型狙击炮", "蓄能爆破炮",
+    "双联火箭发射器", "速射炮", "射束机炮", "转管机炮", "分束机炮",
+    "重型榴弹炮", "干扰烟幕散布器",
+}
+
 
 def _default_settings():
     return {
         "cards_rect": None,
         "refresh_rect": None,
-        "iv_only": False,
-        "arms": {name: True for name in ARMAMENT_NAMES},
-        "refresh_delay": 5,
-        "max_rounds": 0,
-        "action_delay": 300,
+        "iv_only": True,
+        "arms": {name: name in DEFAULT_CHECKED for name in ARMAMENT_NAMES},
+        "refresh_delay": 1,
+        "max_rounds": 100,
+        "action_delay": 200,
     }
 
 
