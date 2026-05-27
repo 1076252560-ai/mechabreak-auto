@@ -1,0 +1,21 @@
+name: Build Release
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - run: python -m PyInstaller --onefile --windowed --name="MechaBreakAuto" --add-data="templates;templates" main.py
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/MechaBreakAuto.exe
+          name: "解限机路网补给助手 ${{ github.ref_name }}"
+          body_path: CHANGELOG.md
