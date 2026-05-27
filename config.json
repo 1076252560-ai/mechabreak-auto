@@ -1,6 +1,16 @@
 {
-  "cards_rect": null,
-  "refresh_rect": null,
+  "cards_rect": [
+    149,
+    526,
+    476,
+    251
+  ],
+  "refresh_rect": [
+    316,
+    945,
+    31,
+    35
+  ],
   "iv_only": true,
   "arms": {
     "六联导弹发射器": true,
@@ -26,6 +36,6 @@
     "热能大剑": false
   },
   "refresh_delay": 1,
-  "max_rounds": 100,
+  "max_rounds": 2,
   "action_delay": 200
 }

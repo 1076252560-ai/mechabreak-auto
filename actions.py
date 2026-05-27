@@ -42,25 +42,16 @@ def set_log(fn):
     _log = fn
 
 
-def _show_dot(x, y, r=14):
+def _show_dot(x, y, r=12):
     hdc = user32.GetDC(0)
     if not hdc:
         return
-    size = r * 2 + 2
-    mem_dc = gdi32.CreateCompatibleDC(hdc)
-    bmp = gdi32.CreateCompatibleBitmap(hdc, size, size)
-    old_bmp = gdi32.SelectObject(mem_dc, bmp)
-    gdi32.BitBlt(mem_dc, 0, 0, size, size, hdc, x - r - 1, y - r - 1, 0x00CC0020)
     brush = gdi32.CreateSolidBrush(0x0000FF)
     prev = gdi32.SelectObject(hdc, brush)
     gdi32.Ellipse(hdc, x - r, y - r, x + r, y + r)
-    time.sleep(0.4)
+    time.sleep(0.35)
     gdi32.SelectObject(hdc, prev)
     gdi32.DeleteObject(brush)
-    gdi32.BitBlt(hdc, x - r - 1, y - r - 1, size, size, mem_dc, 0, 0, 0x00CC0020)
-    gdi32.SelectObject(mem_dc, old_bmp)
-    gdi32.DeleteObject(bmp)
-    gdi32.DeleteDC(mem_dc)
     user32.ReleaseDC(0, hdc)
 
 

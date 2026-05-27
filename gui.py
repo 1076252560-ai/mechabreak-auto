@@ -37,8 +37,7 @@ class App:
         self._restore_state()
         self._poll_log()
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
-        ctypes.windll.user32.RegisterHotKey(self.root.winfo_id(), 1, 0, 0x77)
-        self.root.bind("<F8>", lambda e: self._stop())
+        self.root.after(0, self._poll_f8)
 
     def _build_ui(self):
         p = {"padx": 8, "pady": 4}
@@ -204,6 +203,11 @@ class App:
         self.btn_start.config(state="normal")
         self.btn_stop.config(state="disabled")
         self._q("停止中...")
+
+    def _poll_f8(self):
+        if ctypes.windll.user32.GetAsyncKeyState(0x77) & 0x8000:
+            self._stop()
+        self.root.after(50, self._poll_f8)
 
     def _on_close(self):
         self.running = False

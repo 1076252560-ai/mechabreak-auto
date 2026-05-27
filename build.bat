@@ -17,7 +17,7 @@ if exist build rmdir /s /q build
 if exist dist rmdir /s /q dist
 
 echo [3/3] 开始打包...
-python -m PyInstaller --onefile --windowed --name="解限机路网补给助手" --add-data "templates;templates" --clean main.py
+python -m PyInstaller --onefile --windowed --uac-admin --name="解限机路网补给助手" --add-data "templates;templates" --clean main.py
 
 if %errorlevel% equ 0 (
     echo.
