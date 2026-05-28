@@ -313,17 +313,16 @@ class App:
                     self._q("本轮无")
 
                 if self.running:
-                    if tpl:
-                        rfx, rfy = find_refresh_button(cr, tpl)
+                    rr = self.config_data.get("refresh_rect")
+                    if rr and len(rr) == 4 and rr[2] > 0 and rr[3] > 0:
                         self._q("刷新")
+                        refresh(rr[0] + rr[2] // 2, rr[1] + rr[3] // 2, s["act"])
+                    elif tpl:
+                        self._q("刷新(模板)")
+                        rfx, rfy = find_refresh_button(cr, tpl)
                         refresh(rfx, rfy, s["act"])
                     else:
-                        rr = self.config_data.get("refresh_rect")
-                        if rr and len(rr) == 4 and rr[2] > 0:
-                            self._q("刷新")
-                            refresh(rr[0] + rr[2] // 2, rr[1] + rr[3] // 2, s["act"])
-                        else:
-                            self._q("无刷新模板/坐标，跳过刷新")
+                        self._q("无刷新坐标/模板，跳过刷新")
 
                 for _ in range(s["delay"]):
                     if not self.running:
