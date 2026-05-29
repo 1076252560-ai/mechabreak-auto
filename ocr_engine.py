@@ -3,7 +3,7 @@ import numpy as np
 import os
 import sys
 
-ARM_THRESHOLD = 0.88
+ARM_THRESHOLD = 0.90
 SOLD_THRESHOLD = 0.82
 
 
@@ -48,10 +48,6 @@ def get_sold_out_template():
     return _find_template("已售.png")
 
 
-def get_refresh_template():
-    return _find_template("刷新.png")
-
-
 def _match(image_bgr, tpl_path, threshold):
     if not os.path.exists(tpl_path):
         return False, 0
@@ -87,28 +83,17 @@ def _gray_sold_out(card_bgr):
 def matches_armament(card_bgr, selected_names):
     templates = get_arm_templates()
     best_name, best_conf = "?", 0
+    second_name, second_conf = "?", 0
     for name in selected_names:
         if name not in templates:
             continue
-        ok, conf = _match(card_bgr, templates[name], ARM_THRESHOLD)
-        if ok and conf > best_conf:
+        ok, conf = _match(card_bgr, templates[name], 0)
+        if conf > best_conf:
+            second_name, second_conf = best_name, best_conf
             best_name, best_conf = name, conf
-    return best_name != "?", best_name, best_conf
-
-
-def find_refresh_button(cards_rect, refresh_tpl_path):
-    import mss
-    x0, y0, w0, h0 = cards_rect
-    search_h = 200
-    with mss.mss() as sct:
-        screen = sct.grab({"top": max(0, y0 + h0), "left": x0,
-                           "width": w0, "height": search_h})
-    arr = np.array(screen)[:, :, :3]
-    templ = _imread(refresh_tpl_path)
-    if templ is None or templ.size == 0:
-        return 0, 0
-    result = cv2.matchTemplate(arr, templ, cv2.TM_CCOEFF_NORMED)
-    _, _, _, max_loc = cv2.minMaxLoc(result)
-    cx = x0 + max_loc[0] + templ.shape[1] // 2
-    cy = y0 + h0 + max_loc[1] + templ.shape[0] // 2
-    return cx, cy
+        elif conf > second_conf:
+            second_name, second_conf = name, conf
+    if best_conf >= ARM_THRESHOLD:
+        return True, best_name, best_conf
+    info = f"{best_name}({best_conf:.2f})" if best_conf > 0.3 else "?"
+    return False, info, best_conf
