@@ -14,7 +14,6 @@ from config import load_config, save_config, get_card_rects, save_settings
 from capture import capture_card_regions, reset_debug
 from detector import is_sold_out, is_iv_level, matches_armament
 from actions import buy_card, refresh, set_log
-from ocr_engine import get_refresh_template, find_refresh_button
 from overlay import RegionSelector
 
 
@@ -90,10 +89,12 @@ class App:
             v.trace_add("write", self._on_arm)
 
         sep = r + 2 + (len(ARMAMENT_NAMES) + cols - 1) // cols
-        ttk.Separator(f, orient="horizontal").grid(row=sep, column=0, columnspan=3, sticky="ew", padx=8, pady=8)
+        self.lbl_warn = ttk.Label(f, text="", foreground="red")
+        self.lbl_warn.grid(row=sep, column=0, columnspan=3, sticky="w", padx=8)
+        ttk.Separator(f, orient="horizontal").grid(row=sep + 1, column=0, columnspan=3, sticky="ew", padx=8, pady=8)
 
         bf = ttk.Frame(f)
-        bf.grid(row=sep + 1, column=0, columnspan=3, sticky="ew", **p)
+        bf.grid(row=sep + 2, column=0, columnspan=3, sticky="ew", **p)
         self.btn_start = ttk.Button(bf, text="▶ 开始", command=self._start, width=12)
         self.btn_start.pack(side=tk.LEFT, padx=4)
         self.btn_stop = ttk.Button(bf, text="■ 停止", command=self._stop, width=12, state="disabled")
@@ -101,8 +102,8 @@ class App:
         ttk.Label(bf, text="按 F8 停止", foreground="gray").pack(side=tk.LEFT, padx=8)
 
         self.log = scrolledtext.ScrolledText(f, width=55, height=16, font=("Consolas", 9), state="disabled", wrap=tk.WORD)
-        self.log.grid(row=sep + 2, column=0, columnspan=3, sticky="nsew", **p)
-        f.rowconfigure(sep + 2, weight=1)
+        self.log.grid(row=sep + 3, column=0, columnspan=3, sticky="nsew", **p)
+        f.rowconfigure(sep + 3, weight=1)
         f.columnconfigure(1, weight=1)
 
     _syncing = False
@@ -141,8 +142,10 @@ class App:
         self.var_delay.set(c.get("refresh_delay", DEFAULT_REFRESH_DELAY))
         self.var_rounds.set(c.get("max_rounds", DEFAULT_MAX_ROUNDS))
         self.var_act.set(c.get("action_delay", DEFAULT_ACTION_DELAY))
-        has = c.get("cards_rect") is not None
-        self._q(f"配置: 区域={'有' if has else '无，请配置'}")
+        has = c.get("cards_rect") is not None and c.get("refresh_rect") is not None
+        self._q(f"配置: {'已就绪' if has else '请配置卡片+刷新按钮区域'}")
+        if not has:
+            self.lbl_warn.config(text="请先配置武装卡片区域和刷新按钮区域！")
 
     def _save_state(self):
         save_settings({
@@ -172,14 +175,18 @@ class App:
         if btn:
             self.config_data["refresh_rect"] = list(btn)
         save_config(self.config_data)
+        self.lbl_warn.config(text="")
         self._q(f"已保存: 卡片={cards}, 刷新={btn or '未选'}")
 
     def _start(self):
         if self.running:
             return
-        if self.config_data.get("cards_rect") is None:
-            self._q("请先配置区域！")
+        cards = self.config_data.get("cards_rect")
+        refresh_rect = self.config_data.get("refresh_rect")
+        if not cards or not refresh_rect or len(refresh_rect) < 4 or refresh_rect[2] <= 0:
+            self.lbl_warn.config(text="请先配置武装卡片区域和刷新按钮区域！")
             return
+        self.lbl_warn.config(text="")
         self.running = True
         self.btn_start.config(state="disabled")
         self.btn_stop.config(state="normal")
@@ -192,8 +199,7 @@ class App:
             "arms": self._selected_arms(),
         }
         mode = "仅IV级" if s["iv"] else ("全买" if len(s["arms"]) == len(ARMAMENT_NAMES) else f"指定:{s['arms']}")
-        tpl = "有" if get_refresh_template() else "缺"
-        self._q(f"开始 | 模式={mode} | 刷新模板={tpl} | 最大{s['rounds']}轮")
+        self._q(f"开始 | 模式={mode} | 最大{s['rounds']}轮")
         reset_debug()
         self.worker_thread = threading.Thread(target=self._worker, args=(s,), daemon=True)
         self.worker_thread.start()
@@ -240,8 +246,8 @@ class App:
     def _worker(self, s):
         rounds = 0
         cr = self.config_data["cards_rect"]
+        rr = self.config_data["refresh_rect"]
         card_rects = get_card_rects(cr)
-        tpl = get_refresh_template()
 
         if len(card_rects) < CARD_COUNT:
             self._q("卡片区域异常，请重新配置")
@@ -313,16 +319,8 @@ class App:
                     self._q("本轮无")
 
                 if self.running:
-                    rr = self.config_data.get("refresh_rect")
-                    if rr and len(rr) == 4 and rr[2] > 0 and rr[3] > 0:
-                        self._q("刷新")
-                        refresh(rr[0] + rr[2] // 2, rr[1] + rr[3] // 2, s["act"])
-                    elif tpl:
-                        self._q("刷新(模板)")
-                        rfx, rfy = find_refresh_button(cr, tpl)
-                        refresh(rfx, rfy, s["act"])
-                    else:
-                        self._q("无刷新坐标/模板，跳过刷新")
+                    self._q("刷新")
+                    refresh(rr[0] + rr[2] // 2, rr[1] + rr[3] // 2, s["act"])
 
                 for _ in range(s["delay"]):
                     if not self.running:

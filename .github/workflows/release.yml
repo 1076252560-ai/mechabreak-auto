@@ -19,11 +19,11 @@ jobs:
 
       - run: pip install -r requirements.txt
 
-      - run: python -m PyInstaller --onefile --windowed --uac-admin --name="MechaBreakAuto" --add-data="templates;templates" main.py
+      - run: python -m PyInstaller --onefile --windowed --uac-admin --name="MechaBreakAuto-${{ github.ref_name }}" --add-data="templates;templates" main.py
 
       - uses: softprops/action-gh-release@v2
         with:
-          files: dist/MechaBreakAuto.exe
+          files: dist/MechaBreakAuto-${{ github.ref_name }}.exe
           name: "解限机路网补给助手 ${{ github.ref_name }}"
           body: |
             # 解限机路网补给助手 ${{ github.ref_name }}
@@ -31,12 +31,13 @@ jobs:
             自动刷新路网补给页面，按筛选条件自动购买武装。
 
             ## 使用
-            1. 下载 MechaBreakAuto.exe
+            1. 下载 MechaBreakAuto-${{ github.ref_name }}.exe
             2. 打开游戏路网补给页面
-            3. 运行 EXE → 配置区域 → 勾选武装 → 开始
+            3. 运行 EXE → 配置区域（卡片+刷新按钮）→ 勾选武装 → 开始
 
             ## 功能
             - 模板匹配识别武装和已售状态
             - 紫色检测 IV 级武装
             - 全选 / IV级 / 按名称三种筛选模式
-            - 设置自动保存
+            - F8 全局停止
+            - 启动自动管理员提权
