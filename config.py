@@ -20,7 +20,7 @@ def _default_settings():
     return {
         "cards_rect": None,
         "refresh_rect": None,
-        "iv_only": True,
+        "iv_mode": "all",
         "arms": {name: name in DEFAULT_CHECKED for name in ARMAMENT_NAMES},
         "refresh_delay": 1,
         "max_rounds": 100,

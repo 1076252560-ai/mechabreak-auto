@@ -66,10 +66,13 @@ class App:
         ttk.Separator(f, orient="horizontal").grid(row=6, column=0, columnspan=3, sticky="ew", padx=8, pady=8)
 
         r = 7
-        self.var_iv = tk.BooleanVar(value=False)
-        ttk.Checkbutton(f, text="IV级紫色全买 + 其他按勾选武装", variable=self.var_iv).grid(row=r, column=0, columnspan=3, sticky="w", **p)
+        self.var_iv = tk.StringVar(value="all")
+        ttk.Label(f, text="IV 级选择:", font=("Microsoft YaHei", 9, "bold")).grid(row=r, column=0, columnspan=3, sticky="w", **p)
+        ttk.Radiobutton(f, text="购买所有 4 级紫色武装", variable=self.var_iv, value="all").grid(row=r + 1, column=0, columnspan=3, sticky="w", padx=24, pady=4)
+        ttk.Radiobutton(f, text="仅购买勾选的武装", variable=self.var_iv, value="filter").grid(row=r + 2, column=0, columnspan=3, sticky="w", padx=24, pady=4)
+        ttk.Radiobutton(f, text="不购买 4 级紫色武装", variable=self.var_iv, value="none").grid(row=r + 3, column=0, columnspan=3, sticky="w", padx=24, pady=4)
 
-        r = 8
+        r = 11
         ttk.Label(f, text="武装选择:", font=("Microsoft YaHei", 9, "bold")).grid(row=r, column=0, columnspan=3, sticky="w", **p)
 
         self.var_all = tk.BooleanVar(value=True)
@@ -128,13 +131,25 @@ class App:
         finally:
             self._syncing = False
 
+    def _buy_by_arms(self, arr, i, cx, cy, buy_list, s):
+        if len(s["arms"]) == len(ARMAMENT_NAMES):
+            buy_list.append(i)
+            self._q(f"  #{i + 1}: 可购 @({cx},{cy})")
+        else:
+            ok, name, conf = matches_armament(arr, s["arms"])
+            if ok:
+                buy_list.append(i)
+                self._q(f"  #{i + 1}: {name} c={conf:.2f} @({cx},{cy})")
+            else:
+                self._q(f"  #{i + 1}: 未匹配 @({cx},{cy})")
+
     def _selected_arms(self):
         return [n for n, v in self.arm_vars.items() if v.get()]
 
     def _restore_state(self):
         c = self.config_data
-        if c.get("iv_only"):
-            self.var_iv.set(True)
+        m = c.get("iv_mode", "all")
+        self.var_iv.set(m if m in ("all", "filter", "none") else "all")
         if c.get("arms"):
             for n, checked in c["arms"].items():
                 if n in self.arm_vars:
@@ -149,7 +164,7 @@ class App:
 
     def _save_state(self):
         save_settings({
-            "iv_only": self.var_iv.get(),
+            "iv_mode": self.var_iv.get(),
             "arms": {n: v.get() for n, v in self.arm_vars.items()},
             "refresh_delay": self.var_delay.get(),
             "max_rounds": self.var_rounds.get(),
@@ -198,8 +213,9 @@ class App:
             "iv": self.var_iv.get(),
             "arms": self._selected_arms(),
         }
-        mode = "仅IV级" if s["iv"] else ("全买" if len(s["arms"]) == len(ARMAMENT_NAMES) else f"指定:{s['arms']}")
-        self._q(f"开始 | 模式={mode} | 最大{s['rounds']}轮")
+        iv_label = {"all": "IV全买", "filter": "IV仅勾选", "none": "不买IV", "": "无IV模式"}.get(s["iv"], "?")
+        mode = iv_label + (" + 全买" if len(s["arms"]) == len(ARMAMENT_NAMES) else (" + 指定" if s["arms"] else " + 无"))
+        self._q(f"开始 | {mode} | 最大{s['rounds']}轮")
         reset_debug()
         self.worker_thread = threading.Thread(target=self._worker, args=(s,), daemon=True)
         self.worker_thread.start()
@@ -283,30 +299,23 @@ class App:
                         self._q(f"  #{i + 1}: 已售(g={gray},t={ts}) @({cx},{cy})")
                         continue
 
-                    if s["iv"]:
-                        if is_iv_level(arr):
+                    iv_lv = is_iv_level(arr)
+
+                    if s["iv"] == "all":
+                        if iv_lv:
                             buy_list.append(i)
-                            self._q(f"  #{i + 1}: IV级 ✓ @({cx},{cy})")
-                        elif len(s["arms"]) == len(ARMAMENT_NAMES):
-                            buy_list.append(i)
-                            self._q(f"  #{i + 1}: 可购 @({cx},{cy})")
+                            self._q(f"  #{i + 1}: IV级全买 @({cx},{cy})")
                         else:
-                            ok, name, conf = matches_armament(arr, s["arms"])
-                            if ok:
-                                buy_list.append(i)
-                                self._q(f"  #{i + 1}: {name} c={conf:.2f} @({cx},{cy})")
-                            else:
-                                self._q(f"  #{i + 1}: 未匹配 @({cx},{cy})")
-                    elif len(s["arms"]) == len(ARMAMENT_NAMES):
-                        buy_list.append(i)
-                        self._q(f"  #{i + 1}: 可购 @({cx},{cy})")
+                            self._buy_by_arms(arr, i, cx, cy, buy_list, s)
+                    elif s["iv"] == "filter":
+                        self._buy_by_arms(arr, i, cx, cy, buy_list, s)
+                    elif s["iv"] == "none":
+                        if iv_lv:
+                            self._q(f"  #{i + 1}: IV级跳过 @({cx},{cy})")
+                        else:
+                            self._buy_by_arms(arr, i, cx, cy, buy_list, s)
                     else:
-                        ok, name, conf = matches_armament(arr, s["arms"])
-                        if ok:
-                            buy_list.append(i)
-                            self._q(f"  #{i + 1}: {name} c={conf:.2f} @({cx},{cy})")
-                        else:
-                            self._q(f"  #{i + 1}: 未匹配 @({cx},{cy})")
+                        self._buy_by_arms(arr, i, cx, cy, buy_list, s)
 
                 if buy_list:
                     for idx in buy_list:
