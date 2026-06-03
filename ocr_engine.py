@@ -3,7 +3,7 @@ import numpy as np
 import os
 import sys
 
-ARM_THRESHOLD = 0.90
+ARM_THRESHOLD = 0.85
 SOLD_THRESHOLD = 0.82
 
 
@@ -85,14 +85,17 @@ def matches_armament(card_bgr, selected_names, thresholds=None):
         thresholds = {}
     default_th = thresholds.get("_default", ARM_THRESHOLD)
     templates = get_arm_templates()
-    best_name, best_conf = "?", 0
+    best_name, best_raw = "?", 0
     for name in selected_names:
         if name not in templates:
             continue
-        th = thresholds.get(name, default_th)
-        ok, conf = _match(card_bgr, templates[name], th)
-        if ok and conf > best_conf:
-            best_name, best_conf = name, conf
-    if best_conf > 0:
-        return True, best_name, best_conf
-    return False, "?", 0
+        _, raw_conf = _match(card_bgr, templates[name], 0)
+        if raw_conf > best_raw:
+            best_raw = raw_conf
+            best_name = name
+    if best_raw <= 0:
+        return False, "?", 0
+    th = thresholds.get(best_name, default_th)
+    if best_raw >= th:
+        return True, best_name, best_raw
+    return False, best_name, best_raw

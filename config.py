@@ -25,7 +25,7 @@ def _default_settings():
         "refresh_delay": 1,
         "max_rounds": 100,
         "action_delay": 200,
-        "arm_thresholds": {"_default": 0.90, "蓄能爆破炮": 0.92},
+        "arm_thresholds": {"_default": 0.85, "蓄能爆破炮": 0.92},
     }
 
 

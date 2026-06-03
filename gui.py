@@ -162,7 +162,7 @@ class App:
                 buy_list.append(i)
                 self._q(f"  #{i + 1}: {name} c={conf:.2f} @({cx},{cy})")
             else:
-                self._q(f"  #{i + 1}: 未匹配 @({cx},{cy})")
+                self._q(f"  #{i + 1}: {name} c={conf:.2f} 跳过 @({cx},{cy})")
 
     def _selected_arms(self):
         return [n for n, v in self.arm_vars.items() if v.get()]
