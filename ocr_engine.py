@@ -80,20 +80,19 @@ def _gray_sold_out(card_bgr):
     return (np.sum(s < 30) / s.size) > 0.65
 
 
-def matches_armament(card_bgr, selected_names):
+def matches_armament(card_bgr, selected_names, thresholds=None):
+    if thresholds is None:
+        thresholds = {}
+    default_th = thresholds.get("_default", ARM_THRESHOLD)
     templates = get_arm_templates()
     best_name, best_conf = "?", 0
-    second_name, second_conf = "?", 0
     for name in selected_names:
         if name not in templates:
             continue
-        ok, conf = _match(card_bgr, templates[name], 0)
-        if conf > best_conf:
-            second_name, second_conf = best_name, best_conf
+        th = thresholds.get(name, default_th)
+        ok, conf = _match(card_bgr, templates[name], th)
+        if ok and conf > best_conf:
             best_name, best_conf = name, conf
-        elif conf > second_conf:
-            second_name, second_conf = name, conf
-    if best_conf >= ARM_THRESHOLD:
+    if best_conf > 0:
         return True, best_name, best_conf
-    info = f"{best_name}({best_conf:.2f})" if best_conf > 0.3 else "?"
-    return False, info, best_conf
+    return False, "?", 0

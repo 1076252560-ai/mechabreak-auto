@@ -1,21 +1,22 @@
 {
   "cards_rect": [
-    46,
-    394,
-    469,
-    237
+    71,
+    679,
+    468,
+    249
   ],
   "refresh_rect": [
-    219,
-    730,
-    18,
-    21
+    246,
+    1130,
+    40,
+    38
   ],
+  "iv_only": true,
   "arms": {
     "六联导弹发射器": true,
-    "轻型导弹发射器": false,
+    "轻型导弹发射器": true,
     "重型狙击炮": true,
-    "蓄能爆破炮": false,
+    "蓄能爆破炮": true,
     "双联火箭发射器": true,
     "脉冲飞爪": false,
     "静滞力场": false,
@@ -35,7 +36,11 @@
     "热能大剑": false
   },
   "refresh_delay": 1,
-  "max_rounds": 1,
+  "max_rounds": 2,
   "action_delay": 200,
-  "iv_mode": "all"
+  "iv_mode": "filter",
+  "arm_thresholds": {
+    "_default": 0.9,
+    "蓄能爆破炮": 0.92
+  }
 }

@@ -90,6 +90,10 @@ class App:
         self.var_all.trace_add("write", self._on_all)
         for v in self.arm_vars.values():
             v.trace_add("write", self._on_arm)
+        self.var_iv.trace_add("write", lambda *_: self._schedule_save())
+        self.var_delay.trace_add("write", lambda *_: self._schedule_save())
+        self.var_rounds.trace_add("write", lambda *_: self._schedule_save())
+        self.var_act.trace_add("write", lambda *_: self._schedule_save())
 
         sep = r + 2 + (len(ARMAMENT_NAMES) + cols - 1) // cols
         self.lbl_warn = ttk.Label(f, text="", foreground="red")
@@ -121,6 +125,7 @@ class App:
                 var.set(v)
         finally:
             self._syncing = False
+        self._schedule_save()
 
     def _on_arm(self, *_):
         if self._syncing:
@@ -130,13 +135,29 @@ class App:
             self.var_all.set(all(v.get() for v in self.arm_vars.values()))
         finally:
             self._syncing = False
+        self._schedule_save()
+
+    def _schedule_save(self):
+        if getattr(self, "_skip_save", False):
+            return
+        if getattr(self, "_save_pending", False):
+            return
+        self._save_pending = True
+        self.root.after(500, self._do_save)
+
+    def _do_save(self):
+        self._save_pending = False
+        self._save_state()
+
+    _save_pending = False
 
     def _buy_by_arms(self, arr, i, cx, cy, buy_list, s):
+        thresholds = s.get("thresholds", {})
         if len(s["arms"]) == len(ARMAMENT_NAMES):
             buy_list.append(i)
             self._q(f"  #{i + 1}: 可购 @({cx},{cy})")
         else:
-            ok, name, conf = matches_armament(arr, s["arms"])
+            ok, name, conf = matches_armament(arr, s["arms"], thresholds)
             if ok:
                 buy_list.append(i)
                 self._q(f"  #{i + 1}: {name} c={conf:.2f} @({cx},{cy})")
@@ -147,20 +168,24 @@ class App:
         return [n for n, v in self.arm_vars.items() if v.get()]
 
     def _restore_state(self):
-        c = self.config_data
-        m = c.get("iv_mode", "all")
-        self.var_iv.set(m if m in ("all", "filter", "none") else "all")
-        if c.get("arms"):
-            for n, checked in c["arms"].items():
-                if n in self.arm_vars:
-                    self.arm_vars[n].set(checked)
-        self.var_delay.set(c.get("refresh_delay", DEFAULT_REFRESH_DELAY))
-        self.var_rounds.set(c.get("max_rounds", DEFAULT_MAX_ROUNDS))
-        self.var_act.set(c.get("action_delay", DEFAULT_ACTION_DELAY))
-        has = c.get("cards_rect") is not None and c.get("refresh_rect") is not None
-        self._q(f"配置: {'已就绪' if has else '请配置卡片+刷新按钮区域'}")
-        if not has:
-            self.lbl_warn.config(text="请先配置武装卡片区域和刷新按钮区域！")
+        self._skip_save = True
+        try:
+            c = self.config_data
+            m = c.get("iv_mode", "all")
+            self.var_iv.set(m if m in ("all", "filter", "none") else "all")
+            if c.get("arms"):
+                for n, checked in c["arms"].items():
+                    if n in self.arm_vars:
+                        self.arm_vars[n].set(checked)
+            self.var_delay.set(c.get("refresh_delay", DEFAULT_REFRESH_DELAY))
+            self.var_rounds.set(c.get("max_rounds", DEFAULT_MAX_ROUNDS))
+            self.var_act.set(c.get("action_delay", DEFAULT_ACTION_DELAY))
+            has = c.get("cards_rect") is not None and c.get("refresh_rect") is not None
+            self._q(f"配置: {'已就绪' if has else '请配置卡片+刷新按钮区域'}")
+            if not has:
+                self.lbl_warn.config(text="请先配置武装卡片区域和刷新按钮区域！")
+        finally:
+            self._skip_save = False
 
     def _save_state(self):
         save_settings({
@@ -212,6 +237,7 @@ class App:
             "act": self.var_act.get(),
             "iv": self.var_iv.get(),
             "arms": self._selected_arms(),
+            "thresholds": self.config_data.get("arm_thresholds", {}),
         }
         iv_label = {"all": "IV全买", "filter": "IV仅勾选", "none": "不买IV", "": "无IV模式"}.get(s["iv"], "?")
         mode = iv_label + (" + 全买" if len(s["arms"]) == len(ARMAMENT_NAMES) else (" + 指定" if s["arms"] else " + 无"))

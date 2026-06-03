@@ -20,5 +20,5 @@ def is_iv_level(image_bgr, threshold=0.02):
     return ratio >= threshold
 
 
-def matches_armament(card_bgr, selected_names):
-    return _matches_armament(card_bgr, selected_names)
+def matches_armament(card_bgr, selected_names, thresholds=None):
+    return _matches_armament(card_bgr, selected_names, thresholds)
