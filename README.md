@@ -20,6 +20,7 @@
 3. 选择 IV 级模式 + 勾选要买的武装
 4. 点「▶ 开始」
 5. 关闭窗口时自动保存勾选状态和参数
+
 动画：
 <img width="818" height="554" alt="动画" src="https://github.com/user-attachments/assets/dea63481-e69a-4c37-b819-ad1d71301e02" />
 
