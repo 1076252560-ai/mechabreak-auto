@@ -202,8 +202,12 @@ class App:
         except:
             pass
 
-        # Load GIF on demand (1.5MB, fast enough)
-        gif_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "local", "guide.gif")
+        # Load GIF from templates/ (bundled in EXE)
+        gif_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates", "guide.gif")
+        if not os.path.exists(gif_path):
+            import sys
+            if getattr(sys, "frozen", False):
+                gif_path = os.path.join(sys._MEIPASS, "templates", "guide.gif")
         frames = []
         delay = 100
         if os.path.exists(gif_path):
