@@ -4,6 +4,7 @@ import threading
 import queue
 import time
 import os
+import sys
 import traceback
 import ctypes
 
@@ -278,7 +279,12 @@ class App:
             pass
 
         base = os.path.dirname(os.path.abspath(__file__))
-        img_path = os.path.join(base, image_name)
+        if getattr(sys, "frozen", False):
+            img_path = os.path.join(sys._MEIPASS, "templates", image_name)
+            if not os.path.exists(img_path):
+                img_path = os.path.join(base, "templates", image_name)
+        else:
+            img_path = os.path.join(base, "templates", image_name)
         if os.path.exists(img_path):
             img = Image.open(img_path)
             w, h = img.size
@@ -388,7 +394,7 @@ class App:
         # Step 1: Reference + select cards
         self.root.deiconify()
         self.root.lift()
-        if not self._show_reference_image("参考：6个武装卡片", os.path.join("local", "screenshots", "042122_4.png"),
+        if not self._show_reference_image("参考：6个武装卡片", "ref_cards.png",
                                           "⚠ 请只框选这 6 个武装卡片，不要框选其他区域"):
             self._q("已取消配置")
             return
@@ -416,7 +422,7 @@ class App:
         # Step 2: Reference + select refresh button
         self.root.deiconify()
         self.root.lift()
-        if not self._show_reference_image("参考：刷新按钮", "刷新按钮.png",
+        if not self._show_reference_image("参考：刷新按钮", "ref_refresh.png",
                                           "请框选右下角的刷新按钮"):
             self._q("已取消配置")
             return
