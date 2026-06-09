@@ -22,9 +22,9 @@ def _default_settings():
         "refresh_rect": None,
         "iv_mode": "all",
         "arms": {name: name in DEFAULT_CHECKED for name in ARMAMENT_NAMES},
-        "refresh_delay": 1,
-        "max_rounds": 100,
-        "action_delay": 200,
+        "refresh_delay": 1.5,
+        "max_rounds": 1,
+        "action_delay": 300,
         "arm_thresholds": {"_default": 0.85, "蓄能爆破炮": 0.92},
     }
 
