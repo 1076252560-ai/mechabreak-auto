@@ -22,7 +22,7 @@ if exist build rmdir /s /q build
 if exist dist rmdir /s /q dist
 
 echo [4/4] 开始打包...
-python -m PyInstaller --onefile --windowed --uac-admin --hidden-import=rapidocr --name="MechaBreakAuto-%VER%" --add-data "templates;templates" --clean main.py
+python -m PyInstaller --onefile --windowed --uac-admin --collect-all rapidocr --name="MechaBreakAuto-%VER%" --add-data "templates;templates" --clean main.py
 
 if %errorlevel% equ 0 (
     echo.
