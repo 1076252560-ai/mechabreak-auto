@@ -3,6 +3,7 @@ from tkinter import ttk, scrolledtext
 import threading
 import queue
 import time
+import os
 import traceback
 import ctypes
 
@@ -12,7 +13,7 @@ from constants import (
 )
 from config import load_config, save_config, get_card_rects, save_settings
 from capture import capture_card_regions, reset_debug
-from detector import is_sold_out, is_iv_level, matches_armament
+from detector import is_sold_out, is_iv_level, ocr_card
 from actions import buy_card, refresh, set_log
 from overlay import RegionSelector
 
@@ -27,9 +28,13 @@ class App:
         except Exception:
             pass
 
+        self.root.update_idletasks()
+        self.root.after(100, self._center_window)
+
         self.log_queue = queue.Queue()
         self.running = False
         self.worker_thread = None
+        self._stop_cpu = False
         self.config_data = load_config()
         set_log(self._log)
         self._build_ui()
@@ -37,6 +42,17 @@ class App:
         self._poll_log()
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
         self.root.after(0, self._poll_f8)
+        self.root.after(500, self._show_guide)
+
+    def _center_window(self):
+        self.root.update_idletasks()
+        ww = self.root.winfo_width()
+        wh = self.root.winfo_height()
+        sw = self.root.winfo_screenwidth()
+        sh = self.root.winfo_screenheight()
+        x = (sw - ww) // 2
+        y = (sh - wh) // 2
+        self.root.geometry(f"+{x}+{y}")
 
     def _build_ui(self):
         p = {"padx": 8, "pady": 4}
@@ -45,13 +61,14 @@ class App:
 
         r = 0
         ttk.Label(f, text="坐标配置:", font=("Microsoft YaHei", 9, "bold")).grid(row=r, column=0, sticky="w", **p)
-        ttk.Button(f, text="配置区域", command=self._select_regions).grid(row=r, column=1, columnspan=2, sticky="ew", **p)
+        ttk.Button(f, text="配置区域", command=self._select_regions).grid(row=r, column=1, sticky="ew", **p)
+        ttk.Button(f, text="使用指南", command=self._show_guide).grid(row=r, column=2, sticky="e", **p)
         ttk.Separator(f, orient="horizontal").grid(row=2, column=0, columnspan=3, sticky="ew", padx=8, pady=8)
 
         r = 3
         ttk.Label(f, text="刷新间隔(秒):").grid(row=r, column=0, sticky="w", **p)
-        self.var_delay = tk.IntVar(value=DEFAULT_REFRESH_DELAY)
-        ttk.Spinbox(f, from_=1, to=60, textvariable=self.var_delay, width=6).grid(row=r, column=1, sticky="w", **p)
+        self.var_delay = tk.DoubleVar(value=DEFAULT_REFRESH_DELAY)
+        ttk.Spinbox(f, from_=0.5, to=60, increment=0.5, textvariable=self.var_delay, width=6).grid(row=r, column=1, sticky="w", **p)
 
         r += 1
         ttk.Label(f, text="最大轮数:").grid(row=r, column=0, sticky="w", **p)
@@ -151,19 +168,6 @@ class App:
 
     _save_pending = False
 
-    def _buy_by_arms(self, arr, i, cx, cy, buy_list, s):
-        thresholds = s.get("thresholds", {})
-        if len(s["arms"]) == len(ARMAMENT_NAMES):
-            buy_list.append(i)
-            self._q(f"  #{i + 1}: 可购 @({cx},{cy})")
-        else:
-            ok, name, conf = matches_armament(arr, s["arms"], thresholds)
-            if ok:
-                buy_list.append(i)
-                self._q(f"  #{i + 1}: {name} c={conf:.2f} @({cx},{cy})")
-            else:
-                self._q(f"  #{i + 1}: {name} c={conf:.2f} 跳过 @({cx},{cy})")
-
     def _selected_arms(self):
         return [n for n, v in self.arm_vars.items() if v.get()]
 
@@ -187,6 +191,66 @@ class App:
         finally:
             self._skip_save = False
 
+    def _show_guide(self):
+        import os
+        top = tk.Toplevel(self.root)
+        top.title("使用指南")
+        top.resizable(False, False)
+        top.transient(self.root)
+        try:
+            top.attributes("-topmost", True)
+        except:
+            pass
+
+        # Load GIF on demand (1.5MB, fast enough)
+        gif_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "local", "guide.gif")
+        frames = []
+        delay = 100
+        if os.path.exists(gif_path):
+            try:
+                from PIL import Image, ImageSequence, ImageTk
+                img = Image.open(gif_path)
+                for frame in ImageSequence.Iterator(img):
+                    frames.append(ImageTk.PhotoImage(frame.copy().convert("RGBA")))
+                delay = img.info.get("duration", 100)
+                img.close()
+            except Exception:
+                pass
+
+        if frames:
+            lbl_img = tk.Label(top, image=frames[0])
+            lbl_img.image = frames[0]
+            lbl_img.pack(padx=10, pady=10)
+            idx = [0]
+            def animate():
+                idx[0] = (idx[0] + 1) % len(frames)
+                lbl_img.configure(image=frames[idx[0]])
+                top.after(delay, animate)
+            top.after(delay, animate)
+
+        text_frame = ttk.Frame(top, padding=10)
+        text_frame.pack(fill=tk.BOTH, expand=True)
+        guide_text = (
+            "① 右键管理员运行 EXE\n\n"
+            "② 游戏设置 720p 分辨率 + 窗口模式\n\n"
+            "③ 点「配置区域」→ 框选卡片+刷新按钮\n"
+            "   游戏窗口移动后需重新配置\n\n"
+            "④ 选择 IV 模式 + 勾选武装\n\n"
+            "⑤ 点「▶ 开始」\n\n"
+            "⑥ 按 F8 停止"
+        )
+        ttk.Label(text_frame, text=guide_text, font=("Microsoft YaHei", 10), justify=tk.LEFT).pack()
+        ttk.Button(text_frame, text="关闭", command=top.destroy).pack(pady=(10, 0))
+
+        top.update_idletasks()
+        sw = top.winfo_screenwidth()
+        sh = top.winfo_screenheight()
+        ww = top.winfo_reqwidth()
+        wh = top.winfo_reqheight()
+        top.geometry(f"+{(sw-ww)//2}+{(sh-wh)//2}")
+
+        top.wait_window()
+
     def _save_state(self):
         save_settings({
             "iv_mode": self.var_iv.get(),
@@ -196,27 +260,187 @@ class App:
             "action_delay": self.var_act.get(),
         })
 
+    def _show_reference_image(self, title, image_name, label_text):
+        """Show a reference image popup before region selection. Returns True=proceed, None=cancel."""
+        from PIL import Image, ImageTk
+
+        top = tk.Toplevel(self.root)
+        top.title(title)
+        top.resizable(False, False)
+        top.transient(self.root)
+        try:
+            top.attributes("-topmost", True)
+        except:
+            pass
+
+        base = os.path.dirname(os.path.abspath(__file__))
+        img_path = os.path.join(base, image_name)
+        if os.path.exists(img_path):
+            img = Image.open(img_path)
+            w, h = img.size
+            screen_w = self.root.winfo_screenwidth()
+            if w > screen_w * 0.6:
+                scale = screen_w * 0.6 / w
+                img = img.resize((int(w * scale), int(h * scale)), Image.LANCZOS)
+            tk_img = ImageTk.PhotoImage(img)
+            lbl = tk.Label(top, image=tk_img)
+            lbl.image = tk_img
+            lbl.pack(padx=10, pady=10)
+
+        ttk.Label(top, text=label_text, font=("Microsoft YaHei", 10)).pack(pady=(0, 10))
+
+        result = [None]
+
+        def proceed():
+            result[0] = True
+            top.destroy()
+
+        def cancel():
+            top.destroy()
+
+        top.protocol("WM_DELETE_WINDOW", cancel)
+
+        bf = ttk.Frame(top, padding=5)
+        bf.pack()
+        ttk.Button(bf, text="开始框选", command=proceed).pack(side=tk.LEFT, padx=5)
+        ttk.Button(bf, text="取消", command=cancel).pack(side=tk.LEFT, padx=5)
+
+        top.update_idletasks()
+        top.geometry(f"+{(top.winfo_screenwidth() - top.winfo_reqwidth()) // 2}+{(top.winfo_screenheight() - top.winfo_reqheight()) // 2}")
+        top.wait_window()
+        return result[0]
+
+    def _show_area_preview(self, title, rect, show_grid=False):
+        """Show a preview of the selected area with optional 3x2 grid overlay."""
+        import mss, cv2, numpy as np
+        x, y, w, h = rect
+
+        with mss.mss() as sct:
+            raw = sct.grab({"top": y, "left": x, "width": w, "height": h})
+        frame = np.array(raw)[:, :, :3].copy()
+
+        if show_grid:
+            cw, ch = w // 3, h // 2
+            for row in range(2):
+                for col in range(3):
+                    fx1, fy1 = col * cw, row * ch
+                    fx2, fy2 = fx1 + cw, fy1 + ch
+                    cv2.rectangle(frame, (fx1, fy1), (fx2, fy2), (0, 0, 255), 2)
+                    cv2.putText(frame, str(row * 3 + col + 1), (fx1 + 5, fy1 + 20),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+
+        # Resize for display if too large
+        screen_h = self.root.winfo_screenheight()
+        max_h = int(screen_h * 0.5)
+        if h > max_h:
+            scale = max_h / h
+            frame = cv2.resize(frame, (int(w * scale), max_h))
+
+        from PIL import Image, ImageTk
+        img = Image.fromarray(frame[:, :, ::-1])
+        tk_img = ImageTk.PhotoImage(img)
+
+        top = tk.Toplevel(self.root)
+        top.title(title)
+        top.resizable(False, False)
+        top.transient(self.root)
+        top.focus_force()
+        try:
+            top.attributes("-topmost", True)
+        except:
+            pass
+
+        lbl = tk.Label(top, image=tk_img)
+        lbl.image = tk_img
+        lbl.pack(padx=5, pady=5)
+
+        result = [None]  # None=cancel, True=confirm, False=retry
+
+        def confirm():
+            result[0] = True
+            top.destroy()
+
+        def retry():
+            result[0] = False
+            top.destroy()
+
+        def cancel():
+            top.destroy()
+
+        top.protocol("WM_DELETE_WINDOW", cancel)
+
+        bf = ttk.Frame(top, padding=5)
+        bf.pack()
+        ttk.Button(bf, text=u"✓ 确认", command=confirm).pack(side=tk.LEFT, padx=5)
+        ttk.Button(bf, text=u"↺ 重选", command=retry).pack(side=tk.LEFT, padx=5)
+        ttk.Button(bf, text=u"✕ 取消", command=cancel).pack(side=tk.LEFT, padx=5)
+
+        top.update_idletasks()
+        top.geometry(f"+{(top.winfo_screenwidth() - top.winfo_reqwidth()) // 2}+{(top.winfo_screenheight() - top.winfo_reqheight()) // 2}")
+        top.wait_window()
+        return result[0]
+
     def _select_regions(self):
-        self._q("请拖拽框选 6个武装卡片的整体区域...")
-        self.root.iconify()
-        time.sleep(0.3)
-        sel = RegionSelector("6个武装卡片区域")
-        cards = sel.wait()
-        if cards is None:
-            self.root.deiconify()
-            self._q("已取消")
+        # Step 1: Reference + select cards
+        self.root.deiconify()
+        self.root.lift()
+        if not self._show_reference_image("参考：6个武装卡片", os.path.join("local", "screenshots", "042122_4.png"),
+                                          "⚠ 请只框选这 6 个武装卡片，不要框选其他区域"):
+            self._q("已取消配置")
             return
         self.root.iconify()
         time.sleep(0.3)
-        sel2 = RegionSelector("刷新按钮区域")
-        btn = sel2.wait()
+        while True:
+            sel = RegionSelector("6个武装卡片区域")
+            cards = sel.wait()
+            if cards is None:
+                self._q("已取消卡片配置")
+                self.root.deiconify()
+                return
+            self.root.deiconify()
+            self.root.lift()
+            r = self._show_area_preview("确认卡片区域", cards, show_grid=True)
+            if r is True:
+                break
+            if r is None:
+                self._q("已取消卡片配置")
+                return
+            # Retry: go back to selector
+            self.root.iconify()
+            time.sleep(0.3)
+
+        # Step 2: Reference + select refresh button
+        self.root.deiconify()
+        self.root.lift()
+        if not self._show_reference_image("参考：刷新按钮", "刷新按钮.png",
+                                          "请框选右下角的刷新按钮"):
+            self._q("已取消配置")
+            return
+        self.root.iconify()
+        time.sleep(0.3)
+        while True:
+            sel2 = RegionSelector("刷新按钮区域")
+            btn = sel2.wait()
+            if btn is None:
+                self._q("已取消刷新配置")
+                self.root.deiconify()
+                return
+            self.root.deiconify()
+            self.root.lift()
+            r = self._show_area_preview("确认刷新按钮", btn)
+            if r is True:
+                break
+            if r is None:
+                self._q("已取消刷新配置")
+                return
+            # Retry
+
         self.root.deiconify()
         self.config_data["cards_rect"] = list(cards)
-        if btn:
-            self.config_data["refresh_rect"] = list(btn)
+        self.config_data["refresh_rect"] = list(btn)
         save_config(self.config_data)
         self.lbl_warn.config(text="")
-        self._q(f"已保存: 卡片={cards}, 刷新={btn or '未选'}")
+        self._q("配置已保存")
 
     def _start(self):
         if self.running:
@@ -237,7 +461,6 @@ class App:
             "act": self.var_act.get(),
             "iv": self.var_iv.get(),
             "arms": self._selected_arms(),
-            "thresholds": self.config_data.get("arm_thresholds", {}),
         }
         iv_label = {"all": "IV全买", "filter": "IV仅勾选", "none": "不买IV", "": "无IV模式"}.get(s["iv"], "?")
         mode = iv_label + (" + 全买" if len(s["arms"]) == len(ARMAMENT_NAMES) else (" + 指定" if s["arms"] else " + 无"))
@@ -259,8 +482,12 @@ class App:
 
     def _on_close(self):
         self.running = False
+        self._stop_cpu = True
         self._save_state()
         self.root.destroy()
+
+    def _monitor_cpu(self):
+        pass  # disabled
 
     def _q(self, msg):
         self.log_queue.put(msg)
@@ -304,12 +531,25 @@ class App:
             self._q(f"--- 第 {rounds} 轮 ---")
 
             try:
+                import ctypes
+                ctypes.windll.user32.SetCursorPos(0, 0)
+                time.sleep(0.3)
                 _, _, arrays = capture_card_regions(cr)
+                # TEMP: save raw card area screenshot each round
+                # import mss, cv2, os, numpy as np
+                # ss_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "local", "screenshots")
+                # os.makedirs(ss_path, exist_ok=True)
+                # with mss.mss() as sct:
+                #     raw = sct.grab({"top": cr[1], "left": cr[0], "width": cr[2], "height": cr[3]})
+                # frame = np.array(raw)[:, :, :3]
+                # out = os.path.join(ss_path, f"{time.strftime('%H%M%S')}_{rounds}.png")
+                # cv2.imwrite(out, frame)
                 if len(arrays) < CARD_COUNT:
                     self._q("截图异常，跳过本轮")
                     continue
                 buy_list = []
 
+                t_ocr_start = time.time()
                 for i in range(CARD_COUNT):
                     arr = arrays[i]
                     rec = card_rects[i]
@@ -320,47 +560,71 @@ class App:
                         self._q(f"  #{i + 1}: 空 @({cx},{cy})")
                         continue
 
-                    sold, gray, ts, tc = is_sold_out(arr)
-                    if sold:
-                        self._q(f"  #{i + 1}: 已售(g={gray},t={ts}) @({cx},{cy})")
+                    if is_sold_out(arr):
+                        self._q(f"  #{i + 1}: 已售 @({cx},{cy})")
                         continue
 
-                    iv_lv = is_iv_level(arr)
+                    # OCR: name + level (single call)
+                    name, price, level = ocr_card(arr)
+                    in_list = name in s["arms"] if s["arms"] else False
+                    all_checked = len(s["arms"]) == len(ARMAMENT_NAMES)
+
+                    purp = "purp" if level == 4 else ""
+                    price_str = price if price else "?"
+                    mode = {"all": "IV全", "filter": "IV仅勾", "none": "IV跳", "": "无"}.get(s["iv"], "?")
 
                     if s["iv"] == "all":
-                        if iv_lv:
+                        if level == 4 or all_checked or in_list:
                             buy_list.append(i)
-                            self._q(f"  #{i + 1}: IV级全买 @({cx},{cy})")
+                            act = "买"
                         else:
-                            self._buy_by_arms(arr, i, cx, cy, buy_list, s)
+                            act = "未勾"
                     elif s["iv"] == "filter":
-                        self._buy_by_arms(arr, i, cx, cy, buy_list, s)
-                    elif s["iv"] == "none":
-                        if iv_lv:
-                            self._q(f"  #{i + 1}: IV级跳过 @({cx},{cy})")
+                        if all_checked or in_list:
+                            buy_list.append(i)
+                            act = "买"
                         else:
-                            self._buy_by_arms(arr, i, cx, cy, buy_list, s)
+                            act = "未勾"
+                    elif s["iv"] == "none":
+                        if level == 4:
+                            act = "跳IV"
+                        elif all_checked or in_list:
+                            buy_list.append(i)
+                            act = "买"
+                        else:
+                            act = "未勾"
                     else:
-                        self._buy_by_arms(arr, i, cx, cy, buy_list, s)
+                        if all_checked or in_list:
+                            buy_list.append(i)
+                            act = "买"
+                        else:
+                            act = "未勾"
+
+                    self._q(f"  #{i + 1}: {name} {price_str} {purp} | {mode}->{act} @({cx},{cy})")
+
+                t_ocr = (time.time() - t_ocr_start) * 1000
+                t_act = 0
 
                 if buy_list:
+                    t0 = time.time()
                     for idx in buy_list:
                         if not self.running:
                             break
                         rec = card_rects[idx]
                         self._q(f"▶ 买 #{idx + 1}")
                         buy_card(rec["x"] + rec["w"] // 2, rec["y"] + rec["h"] // 2, s["act"])
+                    t_act = (time.time() - t0) * 1000
                 else:
                     self._q("本轮无")
+
+                self._q(f"【耗时】OCR {t_ocr:.0f}ms | 购买 {t_act:.0f}ms | 总 {t_ocr+t_act:.0f}ms")
 
                 if self.running:
                     self._q("刷新")
                     refresh(rr[0] + rr[2] // 2, rr[1] + rr[3] // 2, s["act"])
 
-                for _ in range(s["delay"]):
-                    if not self.running:
-                        break
-                    time.sleep(1)
+                if self.running:
+                    time.sleep(s["delay"])
 
             except Exception as e:
                 self._q(f"错误: {e}")

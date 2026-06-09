@@ -6,3 +6,6 @@ debug_screenshots/
 *.pyc
 local/
 config.json
+test_ocr.py
+verify_decision.py
+dev_notes.md

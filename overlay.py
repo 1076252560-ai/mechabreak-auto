@@ -41,6 +41,7 @@ class RegionSelector:
         self.canvas.bind("<B1-Motion>", self._on_drag)
         self.canvas.bind("<ButtonRelease-1>", self._on_release)
         self.canvas.bind("<Button-3>", self._on_cancel)
+        self.root.protocol("WM_DELETE_WINDOW", self._on_cancel)
 
     def _update_dim_region(self, x1, y1, x2, y2):
         for oid in self._overlay_ids:

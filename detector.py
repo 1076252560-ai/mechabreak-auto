@@ -1,11 +1,11 @@
 import cv2
 import numpy as np
 from constants import PURPLE_LOWER, PURPLE_UPPER, LEVEL_CHECK_HEIGHT_RATIO
-from ocr_engine import is_sold_out as _is_sold_out, matches_armament as _matches_armament
+from ocr_engine import recognize_card, is_sold_out_by_template
 
 
 def is_sold_out(card_bgr):
-    return _is_sold_out(card_bgr)
+    return is_sold_out_by_template(card_bgr)
 
 
 def is_iv_level(image_bgr, threshold=0.02):
@@ -20,5 +20,21 @@ def is_iv_level(image_bgr, threshold=0.02):
     return ratio >= threshold
 
 
-def matches_armament(card_bgr, selected_names, thresholds=None):
-    return _matches_armament(card_bgr, selected_names, thresholds)
+def ocr_card(card_bgr):
+    name, price = recognize_card(card_bgr)
+
+    # Purple check first (fast, <1ms)
+    if is_iv_level(card_bgr):
+        return name, price, 4
+
+    # Price-based level
+    if price == "400":
+        level = 3
+    elif price == "200":
+        level = 2
+    elif price == "100":
+        level = 1
+    else:
+        level = 0
+
+    return name, price, level
