@@ -1,5 +1,7 @@
 # 解限机路网补给助手
 
+![Downloads](https://gh-down-badges.linkof.link/Coder-Sakura/mechabreak-auto)![Release](https://badgen.net/github/release/Coder-Sakura/mechabreak-auto)
+
 自动刷新路网补给页面，按筛选条件自动购买武装。
 
 ## 功能
