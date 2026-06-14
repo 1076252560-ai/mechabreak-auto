@@ -24,6 +24,9 @@
 - 清理根目录临时文件（build/dist/debug_screenshots/tesseract_portable）
 - 完善 dev_notes.md 开发文档
 
+### 热修复
+- 锁定 `rapidocr==3.7.0`，修复 PyInstaller 打包后 ONNX 模型文件缺失（Actions 安装 3.8.3 导致 `--collect-all` 漏打包 `.onnx`）
+
 ## v1.0.7 ⚠ 重大更新
 
 ### 检测方式变更
