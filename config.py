@@ -10,9 +10,7 @@ else:
 CONFIG_PATH = os.path.join(BASE_DIR, "config.json")
 
 DEFAULT_CHECKED = {
-    "六联导弹发射器", "轻型导弹发射器", "重型狙击炮", "蓄能爆破炮",
-    "双联火箭发射器", "速射炮", "射束机炮", "转管机炮", "分束机炮",
-    "重型榴弹炮", "干扰烟幕散布器",
+    "蓄能爆破炮", "分束机炮", "六联导弹发射器",
 }
 
 
@@ -20,12 +18,13 @@ def _default_settings():
     return {
         "cards_rect": None,
         "refresh_rect": None,
-        "iv_mode": "all",
-        "arms": {name: name in DEFAULT_CHECKED for name in ARMAMENT_NAMES},
+        "iv_mode": "filter",
+        "iv_arms": {name: name in DEFAULT_CHECKED for name in ARMAMENT_NAMES},
+        "i_iii_enabled": True,
+        "i_iii_arms": {name: name in DEFAULT_CHECKED for name in ARMAMENT_NAMES},
         "refresh_delay": 1.5,
         "max_rounds": 1,
         "action_delay": 300,
-        "arm_thresholds": {"_default": 0.85, "蓄能爆破炮": 0.92},
     }
 
 
@@ -34,6 +33,15 @@ def load_config():
         with open(CONFIG_PATH, "r", encoding="utf-8") as f:
             data = json.load(f)
         defaults = _default_settings()
+        if "arms" in data:
+            if "iv_arms" not in data:
+                data["iv_arms"] = dict(data["arms"])
+            if "i_iii_arms" not in data:
+                data["i_iii_arms"] = dict(data["arms"])
+            del data["arms"]
+        data.pop("arm_thresholds", None)
+        if "iv_mode" in data and data["iv_mode"] not in ("all", "filter", "none"):
+            data["iv_mode"] = "filter"
         for k, v in defaults.items():
             if k not in data:
                 data[k] = v

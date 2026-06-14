@@ -12,7 +12,7 @@ from constants import (
     ARMAMENT_NAMES, CARD_COUNT,
     DEFAULT_REFRESH_DELAY, DEFAULT_MAX_ROUNDS, DEFAULT_ACTION_DELAY,
 )
-from config import load_config, save_config, get_card_rects, save_settings
+from config import load_config, save_config, get_card_rects, save_settings, DEFAULT_CHECKED
 from capture import capture_card_regions, reset_debug
 from detector import is_sold_out, is_iv_level, ocr_card
 from actions import buy_card, refresh, set_log
@@ -84,36 +84,58 @@ class App:
         ttk.Separator(f, orient="horizontal").grid(row=6, column=0, columnspan=3, sticky="ew", padx=8, pady=8)
 
         r = 7
-        self.var_iv = tk.StringVar(value="all")
-        ttk.Label(f, text="IV 级选择:", font=("Microsoft YaHei", 9, "bold")).grid(row=r, column=0, columnspan=3, sticky="w", **p)
-        ttk.Radiobutton(f, text="购买所有 4 级紫色武装", variable=self.var_iv, value="all").grid(row=r + 1, column=0, columnspan=3, sticky="w", padx=24, pady=4)
-        ttk.Radiobutton(f, text="仅购买勾选的武装", variable=self.var_iv, value="filter").grid(row=r + 2, column=0, columnspan=3, sticky="w", padx=24, pady=4)
-        ttk.Radiobutton(f, text="不购买 4 级紫色武装", variable=self.var_iv, value="none").grid(row=r + 3, column=0, columnspan=3, sticky="w", padx=24, pady=4)
+        nb = ttk.Notebook(f)
+        nb.grid(row=r, column=0, columnspan=3, sticky="ew", padx=8, pady=(8, 0))
 
-        r = 11
-        ttk.Label(f, text="武装选择:", font=("Microsoft YaHei", 9, "bold")).grid(row=r, column=0, columnspan=3, sticky="w", **p)
+        iv_tab = ttk.Frame(nb, padding=5)
+        nb.add(iv_tab, text="IV级武装")
+        self.var_iv_mode = tk.StringVar(value="filter")
+        ttk.Radiobutton(iv_tab, text="购买所有 4 级武装", variable=self.var_iv_mode, value="all").grid(row=0, column=0, columnspan=3, sticky="w", pady=2)
+        ttk.Radiobutton(iv_tab, text="按勾选购买 4 级武装", variable=self.var_iv_mode, value="filter").grid(row=1, column=0, sticky="w", pady=2)
+        self.iv_fold_btn = ttk.Button(iv_tab, text="▼ 折叠", width=7, command=self._toggle_iv_fold)
+        self.iv_fold_btn.grid(row=1, column=1, sticky="e", padx=4, pady=2)
+        ttk.Radiobutton(iv_tab, text="不购买 4 级武装", variable=self.var_iv_mode, value="none").grid(row=2, column=0, columnspan=3, sticky="w", pady=2)
 
-        self.var_all = tk.BooleanVar(value=True)
-        ttk.Checkbutton(f, text="全选", variable=self.var_all).grid(row=r + 1, column=0, sticky="w", **p)
-
-        self.arm_vars = {}
-        cols = 3
+        self.iv_cb_frame = ttk.Frame(iv_tab)
+        self.iv_cb_frame.grid(row=3, column=0, columnspan=3, sticky="w", pady=(4, 0))
+        self.iv_arm_vars = {}
         for i, name in enumerate(ARMAMENT_NAMES):
-            rr = r + 2 + i // cols
-            cc = i % cols
-            var = tk.BooleanVar(value=True)
-            self.arm_vars[name] = var
-            ttk.Checkbutton(f, text=name, variable=var).grid(row=rr, column=cc, sticky="w", padx=(24 if cc == 0 else 4, 4), pady=1)
+            rr = i // 3
+            cc = i % 3
+            var = tk.BooleanVar(value=name in DEFAULT_CHECKED)
+            self.iv_arm_vars[name] = var
+            ttk.Checkbutton(self.iv_cb_frame, text=name, variable=var).grid(row=rr, column=cc, sticky="w", padx=(0, 8), pady=1)
+            var.trace_add("write", lambda *_: self._schedule_save())
 
-        self.var_all.trace_add("write", self._on_all)
-        for v in self.arm_vars.values():
-            v.trace_add("write", self._on_arm)
-        self.var_iv.trace_add("write", lambda *_: self._schedule_save())
+        iii_tab = ttk.Frame(nb, padding=5)
+        nb.add(iii_tab, text="I~III级武装")
+        self.var_i_iii_enabled = tk.BooleanVar(value=True)
+        ttk.Radiobutton(iii_tab, text="购买勾选的 I~III 级武装", variable=self.var_i_iii_enabled, value=True).grid(row=0, column=0, sticky="w", pady=2)
+        self.iii_fold_btn = ttk.Button(iii_tab, text="▼ 折叠", width=7, command=self._toggle_iii_fold)
+        self.iii_fold_btn.grid(row=0, column=1, sticky="e", padx=4, pady=2)
+        ttk.Radiobutton(iii_tab, text="不购买 I~III 级武装", variable=self.var_i_iii_enabled, value=False).grid(row=1, column=0, columnspan=3, sticky="w", pady=2)
+
+        self.iii_cb_frame = ttk.Frame(iii_tab)
+        self.iii_cb_frame.grid(row=2, column=0, columnspan=3, sticky="w", pady=(4, 0))
+        self.i_iii_arm_vars = {}
+        for i, name in enumerate(ARMAMENT_NAMES):
+            rr = i // 3
+            cc = i % 3
+            var = tk.BooleanVar(value=name in DEFAULT_CHECKED)
+            self.i_iii_arm_vars[name] = var
+            ttk.Checkbutton(self.iii_cb_frame, text=name, variable=var).grid(row=rr, column=cc, sticky="w", padx=(0, 8), pady=1)
+            var.trace_add("write", lambda *_: self._schedule_save())
+
+        self._iv_folded = False
+        self._iii_folded = False
+
+        self.var_iv_mode.trace_add("write", self._on_iv_mode_changed)
+        self.var_i_iii_enabled.trace_add("write", self._on_i_iii_enabled_changed)
         self.var_delay.trace_add("write", lambda *_: self._schedule_save())
         self.var_rounds.trace_add("write", lambda *_: self._schedule_save())
         self.var_act.trace_add("write", lambda *_: self._schedule_save())
 
-        sep = r + 2 + (len(ARMAMENT_NAMES) + cols - 1) // cols
+        sep = r + 1
         self.lbl_warn = ttk.Label(f, text="", foreground="red")
         self.lbl_warn.grid(row=sep, column=0, columnspan=3, sticky="w", padx=8)
         ttk.Separator(f, orient="horizontal").grid(row=sep + 1, column=0, columnspan=3, sticky="ew", padx=8, pady=8)
@@ -131,28 +153,43 @@ class App:
         f.rowconfigure(sep + 3, weight=1)
         f.columnconfigure(1, weight=1)
 
-    _syncing = False
+    def _toggle_iv_fold(self):
+        self._iv_folded = not self._iv_folded
+        if self._iv_folded:
+            self.iv_fold_btn.config(text="▶ 展开")
+            self.iv_cb_frame.grid_forget()
+        else:
+            self.iv_fold_btn.config(text="▼ 折叠")
+            self.iv_cb_frame.grid(row=3, column=0, columnspan=3, sticky="w", pady=(4, 0))
 
-    def _on_all(self, *_):
-        if self._syncing:
-            return
-        self._syncing = True
-        try:
-            v = self.var_all.get()
-            for var in self.arm_vars.values():
-                var.set(v)
-        finally:
-            self._syncing = False
+    def _toggle_iii_fold(self):
+        self._iii_folded = not self._iii_folded
+        if self._iii_folded:
+            self.iii_fold_btn.config(text="▶ 展开")
+            self.iii_cb_frame.grid_forget()
+        else:
+            self.iii_fold_btn.config(text="▼ 折叠")
+            self.iii_cb_frame.grid(row=2, column=0, columnspan=3, sticky="w", pady=(4, 0))
+
+    def _on_iv_mode_changed(self, *_):
+        mode = self.var_iv_mode.get()
+        if mode == "filter":
+            self.iv_fold_btn.grid(row=1, column=1, sticky="e", padx=4, pady=2)
+            if not self._iv_folded:
+                self.iv_cb_frame.grid(row=3, column=0, columnspan=3, sticky="w", pady=(4, 0))
+        else:
+            self.iv_fold_btn.grid_forget()
+            self.iv_cb_frame.grid_forget()
         self._schedule_save()
 
-    def _on_arm(self, *_):
-        if self._syncing:
-            return
-        self._syncing = True
-        try:
-            self.var_all.set(all(v.get() for v in self.arm_vars.values()))
-        finally:
-            self._syncing = False
+    def _on_i_iii_enabled_changed(self, *_):
+        if self.var_i_iii_enabled.get():
+            self.iii_fold_btn.grid(row=0, column=1, sticky="e", padx=4, pady=2)
+            if not self._iii_folded:
+                self.iii_cb_frame.grid(row=2, column=0, columnspan=3, sticky="w", pady=(4, 0))
+        else:
+            self.iii_fold_btn.grid_forget()
+            self.iii_cb_frame.grid_forget()
         self._schedule_save()
 
     def _schedule_save(self):
@@ -169,19 +206,21 @@ class App:
 
     _save_pending = False
 
-    def _selected_arms(self):
-        return [n for n, v in self.arm_vars.items() if v.get()]
-
     def _restore_state(self):
         self._skip_save = True
         try:
             c = self.config_data
-            m = c.get("iv_mode", "all")
-            self.var_iv.set(m if m in ("all", "filter", "none") else "all")
-            if c.get("arms"):
-                for n, checked in c["arms"].items():
-                    if n in self.arm_vars:
-                        self.arm_vars[n].set(checked)
+            m = c.get("iv_mode", "filter")
+            self.var_iv_mode.set(m if m in ("all", "filter", "none") else "filter")
+            if c.get("iv_arms"):
+                for n, checked in c["iv_arms"].items():
+                    if n in self.iv_arm_vars:
+                        self.iv_arm_vars[n].set(checked)
+            self.var_i_iii_enabled.set(c.get("i_iii_enabled", True))
+            if c.get("i_iii_arms"):
+                for n, checked in c["i_iii_arms"].items():
+                    if n in self.i_iii_arm_vars:
+                        self.i_iii_arm_vars[n].set(checked)
             self.var_delay.set(c.get("refresh_delay", DEFAULT_REFRESH_DELAY))
             self.var_rounds.set(c.get("max_rounds", DEFAULT_MAX_ROUNDS))
             self.var_act.set(c.get("action_delay", DEFAULT_ACTION_DELAY))
@@ -240,7 +279,7 @@ class App:
             "② 游戏设置 720p 分辨率 + 窗口模式\n\n"
             "③ 点「配置区域」→ 框选卡片+刷新按钮\n"
             "   游戏窗口移动后需重新配置\n\n"
-            "④ 选择 IV 模式 + 勾选武装\n\n"
+            "④ 选择 IV级/I~III级 策略 + 勾选武装\n\n"
             "⑤ 点「▶ 开始」\n\n"
             "⑥ 按 F8 停止"
         )
@@ -258,8 +297,10 @@ class App:
 
     def _save_state(self):
         save_settings({
-            "iv_mode": self.var_iv.get(),
-            "arms": {n: v.get() for n, v in self.arm_vars.items()},
+            "iv_mode": self.var_iv_mode.get(),
+            "iv_arms": {n: v.get() for n, v in self.iv_arm_vars.items()},
+            "i_iii_enabled": self.var_i_iii_enabled.get(),
+            "i_iii_arms": {n: v.get() for n, v in self.i_iii_arm_vars.items()},
             "refresh_delay": self.var_delay.get(),
             "max_rounds": self.var_rounds.get(),
             "action_delay": self.var_act.get(),
@@ -469,12 +510,14 @@ class App:
             "delay": self.var_delay.get(),
             "rounds": self.var_rounds.get(),
             "act": self.var_act.get(),
-            "iv": self.var_iv.get(),
-            "arms": self._selected_arms(),
+            "iv_mode": self.var_iv_mode.get(),
+            "iv_arms": {n for n, v in self.iv_arm_vars.items() if v.get()},
+            "i_iii_enabled": self.var_i_iii_enabled.get(),
+            "i_iii_arms": {n for n, v in self.i_iii_arm_vars.items() if v.get()},
         }
-        iv_label = {"all": "IV全买", "filter": "IV仅勾选", "none": "不买IV", "": "无IV模式"}.get(s["iv"], "?")
-        mode = iv_label + (" + 全买" if len(s["arms"]) == len(ARMAMENT_NAMES) else (" + 指定" if s["arms"] else " + 无"))
-        self._q(f"开始 | {mode} | 最大{s['rounds']}轮")
+        iv_label = {"all": "IV全买", "filter": "IV勾选", "none": "IV不买"}.get(s["iv_mode"], "?")
+        iii_label = "I~III勾选" if s["i_iii_enabled"] else "I~III不买"
+        self._q(f"开始 | {iv_label} + {iii_label} | 最大{s['rounds']}轮")
         reset_debug()
         self.worker_thread = threading.Thread(target=self._worker, args=(s,), daemon=True)
         self.worker_thread.start()
@@ -576,41 +619,33 @@ class App:
 
                     # OCR: name + level (single call)
                     name, price, level = ocr_card(arr)
-                    in_list = name in s["arms"] if s["arms"] else False
-                    all_checked = len(s["arms"]) == len(ARMAMENT_NAMES)
 
                     purp = "purp" if level == 4 else ""
                     price_str = price if price else "?"
-                    mode = {"all": "IV全", "filter": "IV仅勾", "none": "IV跳", "": "无"}.get(s["iv"], "?")
 
-                    if s["iv"] == "all":
-                        if level == 4 or all_checked or in_list:
+                    if level == 4:
+                        if s["iv_mode"] == "all":
                             buy_list.append(i)
-                            act = "买"
+                            act = "IV:全->买"
+                        elif s["iv_mode"] == "filter":
+                            if name in s["iv_arms"]:
+                                buy_list.append(i)
+                                act = "IV:勾->买"
+                            else:
+                                act = "IV:勾->跳"
                         else:
-                            act = "未勾"
-                    elif s["iv"] == "filter":
-                        if all_checked or in_list:
-                            buy_list.append(i)
-                            act = "买"
-                        else:
-                            act = "未勾"
-                    elif s["iv"] == "none":
-                        if level == 4:
-                            act = "跳IV"
-                        elif all_checked or in_list:
-                            buy_list.append(i)
-                            act = "买"
-                        else:
-                            act = "未勾"
+                            act = "IV:不买"
                     else:
-                        if all_checked or in_list:
-                            buy_list.append(i)
-                            act = "买"
+                        if s["i_iii_enabled"]:
+                            if name in s["i_iii_arms"]:
+                                buy_list.append(i)
+                                act = "I~III:勾->买"
+                            else:
+                                act = "I~III:勾->跳"
                         else:
-                            act = "未勾"
+                            act = "I~III:不买"
 
-                    self._q(f"  #{i + 1}: {name} {price_str} {purp} | {mode}->{act} @({cx},{cy})")
+                    self._q(f"  #{i + 1}: {name} {price_str} {purp} | {act} @({cx},{cy})")
 
                 t_ocr = (time.time() - t_ocr_start) * 1000
                 t_act = 0
