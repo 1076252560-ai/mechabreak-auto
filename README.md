@@ -1,6 +1,6 @@
 # 解限机路网补给助手
 
-![Downloads](https://img.shields.io/github/downloads/Coder-Sakura/mechabreak-auto/total?label=Downloads) ![Release](https://badgen.net/github/release/Coder-Sakura/mechabreak-auto?label=Release)
+![Downloads](https://img.shields.io/github/downloads/Coder-Sakura/mechabreak-auto/total?label=Downloads&cacheSeconds=3600) ![Release](https://badgen.net/github/release/Coder-Sakura/mechabreak-auto?label=Release)
 
 自动刷新路网补给页面，按筛选条件自动购买武装。
 
